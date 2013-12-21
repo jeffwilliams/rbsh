@@ -1,0 +1,222 @@
+#!/usr/bin/env ruby1.9.1
+# http://www.gnu.org/software/libc/manual/html_node/Implementing-a-Shell.html
+
+# rb-readline gem. Tested with version 0.5.
+require 'rb-readline'
+require 'etc'
+require 'Termcolor'
+# ruby-termios. 0.9.6
+require 'termios'
+require 'rbsh/job_control'
+
+include Rbsh
+
+$shell_name = "rbsh"
+
+class DirHistory
+  def initialize(maxlen = 100)
+    @maxlen = maxlen
+    @history = []
+    @curdir_index = -1
+  end
+
+  def forward
+    if @curdir_index < @history.length-1
+      @curdir_index += 1
+      Dir.chdir @history[@curdir_index]
+    end 
+  end
+
+  def back
+    if @curdir_index > 0
+      @curdir_index -= 1
+      Dir.chdir @history[@curdir_index]
+    end
+  end
+
+  def cd(dir)
+    return if curdir == dir
+    if @curdir_index < @history.length-1
+      @history.pop @history.length-1-@curdir_index
+    end
+
+    @history.push dir
+    @curdir_index += 1
+
+    @history.shift(@maxlen-@history.length) if @history.length > @maxlen
+  end
+
+  def curdir
+    @history[@curdir_index]
+  end
+
+  def to_s
+    rc = Array.new(@history)
+    rc[@curdir_index] = "*" + rc[@curdir_index] if @curdir_index >= 0
+    rc
+  end
+end
+
+# Define custom functions that can be called on keypresses in Readline. This is a bit of a hack:
+# we define methods on RbReadline, and then use rl_bind_keyseq_if_unbound to tell readline to
+# run the method with that name in RbReadline. RbReadline uses Kernel.send to make the call.
+module RbReadline
+  def self.rl_dir_forward(count, key)
+    rl_replace_line "cdf", false
+    @rl_done = true
+    0
+  end
+
+  def self.rl_dir_back(count, key)
+    rl_replace_line "cdb", false
+    @rl_done = true
+    0
+  end
+end
+
+class RubyShell
+
+  def initialize
+    @dirhistory = DirHistory.new
+    @default_term_attrs = nil
+  end
+
+
+  def run
+    #@dirhistory.cd File.absolute_path(Dir.pwd)
+    @job_control = JobControl.new
+
+    # Bind ALT-Right to call rl_dir_forward
+    RbReadline.rl_bind_keyseq_if_unbound("\e[3C", :rl_dir_forward)
+    RbReadline.rl_bind_keyseq_if_unbound("\e[3D", :rl_dir_back)
+
+
+    Readline.completion_append_character = " "
+    Readline.completion_proc = Proc.new do |str|
+      if Readline.point > 0
+        
+        completing_first_word = Readline.line_buffer[0,Readline.point].index(' ').nil?
+
+        if completing_first_word
+          complete_command(str)
+        else
+          # Complete for file
+          Dir[str+'*'].grep( /^#{Regexp.escape(str)}/ )     
+        end
+      else
+        []
+      end
+    end
+
+
+    while true
+      @job_control.update_job_status do |job_process|
+        notify_job_status(job_process)
+      end
+
+      #puts "#{@dirhistory.to_s}"
+      line = nil
+      line = Readline.readline(prompt, true)
+
+      # Exit on EOF
+      break if ! line
+
+      line.strip!
+      next if line.length == 0
+
+      tokens = line.split(/\s+/)
+
+      next if check_and_handle_builtin(tokens)
+
+      if line[0,1] == '!'
+        line = line[1,line.length]
+        result = eval line
+        puts result
+      else
+        begin
+          job_process = @job_control.launch_process(line)
+          notify_job_status(job_process)
+        rescue
+          puts "#{$shell_name}: #{$!}"
+        end
+      end
+    end
+
+    puts
+  end
+
+  private
+
+  def check_and_handle_builtin(tokens)
+    handled = true
+    if tokens.first == "exit"
+      exit 0
+    elsif tokens.first == "cd"
+      begin
+        if tokens.length > 0
+          Dir.chdir tokens[1]
+        else
+          Dir.chdir
+        end
+        @dirhistory.cd File.absolute_path(Dir.pwd)
+      rescue Errno::ENOENT
+      end
+    elsif tokens.first == "cdf"
+      @dirhistory.forward
+      puts
+    elsif tokens.first == "cdb"
+      @dirhistory.back
+      puts
+    elsif tokens.first == "jobs"
+      @job_control.processes.each do |pid, job_process|
+        puts "[#{job_process.id}] #{job_process.cmd} (#{job_process.stopped? ? "stopped" : "completed"}) {#{job_process.status}}"
+      end
+    elsif tokens.first == "fg"
+      @job_control.processes.each do |pid, job_process|
+        job_process = @job_control.put_in_foreground(job_process.pid, true) if job_process.stopped?
+        notify_job_status(job_process)
+      end
+    else
+      handled = false
+    end
+    handled
+  end
+
+  def notify_job_status(job_process)
+    if job_process.stopped?
+      puts "Job '#{job_process.cmd}' stopped"
+    else
+      puts "Job '#{job_process.cmd}' completed"
+    end
+  end
+
+  def complete_command(cmd)
+    matches = []
+    ENV["PATH"].split(":").each do |dir|
+      next if ! File.exists?(dir)
+      
+      m = Dir.new(dir).collect do |e|
+        match = nil
+        if e[0,1] != '.'
+          match = e if e[0,cmd.length] == cmd
+        end
+        match
+      end
+      matches = matches.concat(m.compact)
+    end
+    matches
+  end
+
+  def replace_homedir_with_tilde(path)
+    path.gsub(ENV["HOME"],'~')
+  end
+
+  def prompt
+    p = "{196}#{Etc.getlogin}@#{`hostname -s`.chomp}{d}:{c}#{replace_homedir_with_tilde(Dir.pwd)}{d}$ "
+    color = Termcolorizer.new
+    color.colorizeWithEscapes(p)
+  end
+
+end
+
+RubyShell.new.run
