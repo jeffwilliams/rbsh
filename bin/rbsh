@@ -92,8 +92,8 @@ class RubyShell
   def initialize
     @dirhistory = DirHistory.new
     @default_term_attrs = nil
+    @builtins = %w(exit cd cdf cdb jobs fg)
   end
-
 
   def run
     @dirhistory.cd File.absolute_path(Dir.pwd)
@@ -217,7 +217,17 @@ class RubyShell
   end
 
   def complete_command(cmd)
+    #matches = Array.new(@builtins)
     matches = []
+    m = @builtins.collect do |e|
+      if e[0,cmd.length] == cmd
+        e
+      else
+        nil
+      end
+    end
+    matches = matches.concat(m.compact)
+
     ENV["PATH"].split(":").each do |dir|
       next if ! File.exists?(dir)
       
