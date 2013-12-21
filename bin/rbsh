@@ -7,11 +7,24 @@ require 'etc'
 require 'Termcolor'
 # ruby-termios. 0.9.6
 require 'termios'
+require 'getoptlong'
 require 'rbsh/job_control'
 
 include Rbsh
 
 $shell_name = "rbsh"
+$verbose = false
+
+opts = GetoptLong.new(
+  [ '--verbose', '-v', GetoptLong::NO_ARGUMENT ],
+) 
+
+opts.each do |opt, arg|
+  if opt == '--verbose'
+    $verbose = true    
+  end 
+end   
+
 
 class DirHistory
   def initialize(maxlen = 100)
@@ -83,13 +96,14 @@ class RubyShell
 
 
   def run
-    #@dirhistory.cd File.absolute_path(Dir.pwd)
+    @dirhistory.cd File.absolute_path(Dir.pwd)
     @job_control = JobControl.new
 
     # Bind ALT-Right to call rl_dir_forward
     RbReadline.rl_bind_keyseq_if_unbound("\e[3C", :rl_dir_forward)
     RbReadline.rl_bind_keyseq_if_unbound("\e[3D", :rl_dir_back)
-
+    RbReadline.rl_bind_keyseq_if_unbound("\e[1;3C", :rl_dir_forward)
+    RbReadline.rl_bind_keyseq_if_unbound("\e[1;3D", :rl_dir_back)
 
     Readline.completion_append_character = " "
     Readline.completion_proc = Proc.new do |str|
@@ -133,12 +147,7 @@ class RubyShell
         result = eval line
         puts result
       else
-        begin
-          job_process = @job_control.launch_process(line)
-          notify_job_status(job_process)
-        rescue
-          puts "#{$shell_name}: #{$!}"
-        end
+        run_cmd line
       end
     end
 
@@ -146,6 +155,23 @@ class RubyShell
   end
 
   private
+
+  def run_cmd(cmd)
+
+    state = :foreground
+    if cmd =~ /(.*)&$/
+      state = :background
+      cmd = $1
+    end
+
+    begin
+      job_process = @job_control.launch_process(cmd, state)
+      notify_job_status(job_process)
+    rescue
+      puts "#{$shell_name}: #{$!}"
+      puts $!.backtrace.join "\n" if $verbose
+    end
+  end
 
   def check_and_handle_builtin(tokens)
     handled = true
@@ -169,7 +195,7 @@ class RubyShell
       puts
     elsif tokens.first == "jobs"
       @job_control.processes.each do |pid, job_process|
-        puts "[#{job_process.id}] #{job_process.cmd} (#{job_process.stopped? ? "stopped" : "completed"}) {#{job_process.status}}"
+        puts "[#{job_process.id}] #{job_process.cmd} (#{job_process.status})"
       end
     elsif tokens.first == "fg"
       @job_control.processes.each do |pid, job_process|
@@ -186,7 +212,7 @@ class RubyShell
     if job_process.stopped?
       puts "Job '#{job_process.cmd}' stopped"
     else
-      puts "Job '#{job_process.cmd}' completed"
+      puts "Job '#{job_process.cmd}' completed" if job_process.fg_or_bg == :background
     end
   end
 

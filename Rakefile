@@ -7,5 +7,5 @@ task :makegem do
 end
 
 task :run do
-  exec "ruby1.9.1 -I lib/ bin/rbsh"
+  exec "ruby1.9.1 -I lib/ bin/rbsh -v"
 end

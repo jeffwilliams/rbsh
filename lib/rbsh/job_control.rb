@@ -7,28 +7,42 @@ module Rbsh
       @cmd = cmd
       @pid = pid
       @status = status
+      @fg_or_bg = :foreground
     end
     
     attr_accessor :id
     attr_accessor :cmd
     attr_accessor :pid
+    attr_accessor :fg_or_bg
+
     def completed?
-      !@status.stopped?
+      @status == :completed
     end
     def stopped?  
-      @status.stopped?
+      @status == :stopped
     end
     attr_accessor :status
+
+    def set_status_from_process_status(s)
+      if s.stopped?
+        @status = :stopped
+      else
+        @status = :completed
+      end
+    end
 
   end
 
   class JobControl
     def initialize
-=begin
-      "A subshell that runs interactively has to ensure that it has been placed in the foreground by its parent shell before it can enable job control itself. It does this by getting its initial process group ID with the getpgrp function, and comparing it to the process group ID of the current foreground job associated with its controlling terminal (which can be retrieved using the tcgetpgrp function).
-
-  If the subshell is not running as a foreground job, it must stop itself by sending a SIGTTIN signal to its own process group. It may not arbitrarily put itself into the foreground; it must wait for the user to tell the parent shell to do this. If the subshell is continued again, it should repeat the check and stop itself again if it is still not in the foreground. "
-=end
+      #"A subshell that runs interactively has to ensure that it has been placed in the foreground by its 
+      # parent shell before it can enable job control itself. It does this by getting its initial process group ID 
+      # with the getpgrp function, and comparing it to the process group ID of the current foreground job associated 
+      # with its controlling terminal (which can be retrieved using the tcgetpgrp function).
+      # If the subshell is not running as a foreground job, it must stop itself by sending a SIGTTIN signal to its 
+      # own process group. It may not arbitrarily put itself into the foreground; it must wait for the user to tell 
+      # the parent shell to do this. If the subshell is continued again, it should repeat the check and stop itself 
+      # again if it is still not in the foreground. "
       while Termios.tcgetpgrp($stdin) != Process.getpgrp
         Process.kill("TTIN", 0)
       end
@@ -60,12 +74,12 @@ module Rbsh
 
     # Fork and start a process in the foreground. Returns the JobProcess
     # representing the new process.
-    def launch_process(cmd)
+    def launch_process(cmd, fg_or_bg = :foreground)
       child_pid = Process.fork do
         # This process starts as a new process group
         Process.setpgid Process.pid, Process.pid
         # Give this process control of the terminal
-        Termios.tcsetpgrp $stdin, Process.pid
+        Termios.tcsetpgrp $stdin, Process.pid if fg_or_bg == :foreground
         # Set the handling for job control back to the default
         Signal.trap('INT', 'SIG_DFL');
         Signal.trap('QUIT', 'SIG_DFL');
@@ -85,9 +99,14 @@ module Rbsh
       # be done in the child and the shell to prevent race conditions
       Process.setpgid(child_pid, child_pid)
 
-      job_process = JobProcess.new(@id_generator.get, cmd, child_pid, $?)
+      job_process = JobProcess.new(@id_generator.get, cmd, child_pid, :running)
+      job_process.fg_or_bg = fg_or_bg
       @processes[child_pid] = job_process
-      put_in_foreground(child_pid)
+      if fg_or_bg == :foreground
+        put_in_foreground(child_pid)
+      else
+        put_in_background(child_pid)
+      end
     end
 
     # Check the status of existing jobs. If a block is passed it is called with
@@ -98,7 +117,7 @@ module Rbsh
         loop do
           pid = Process.waitpid(-1, Process::WUNTRACED|Process::WNOHANG)
           break if pid.nil? || pid == 0
-          @processes[pid].status = $?
+          @processes[pid].set_status_from_process_status($?)
           yield @processes[pid] if block_given?
         end
       rescue Errno::ECHILD
@@ -129,9 +148,13 @@ module Rbsh
 
       # Get control of terminal back to the shell
       Termios.tcsetpgrp $stdin, Process.pid
-      @processes[pid].status = $? if @processes[pid]
+      @processes[pid].set_status_from_process_status($?) if @processes[pid]
       @processes[pid]
     end
-    private
+
+    def put_in_background(pid, cont = false)
+      Process.kill("SIGCONT", -pid) if cont
+      @processes[pid]
+    end
   end
 end
