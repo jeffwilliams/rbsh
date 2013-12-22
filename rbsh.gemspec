@@ -6,9 +6,9 @@ Gem::Specification.new do |s|
   s.email = %q{jeff.williams@bridgewatersys.com}
   s.summary = %q{Ruby shell}
   s.description = %q{A ruby shell}
-  s.files = ["rbsh"]
+  s.files = ["bin/rbsh"] + Dir['lib/**/*.rb']
   s.has_rdoc = false
   s.require_path = "."
   s.bindir = "."
-  s.executables = ["rbsh"]
+  s.executables = ["bin/rbsh"]
 end
