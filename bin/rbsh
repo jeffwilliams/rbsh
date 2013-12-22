@@ -85,6 +85,12 @@ module RbReadline
     @rl_done = true
     0
   end
+
+  def self.rl_dir_up(count, key)
+    rl_replace_line "cdup", false
+    @rl_done = true
+    0
+  end
 end
 
 class RubyShell
@@ -102,8 +108,10 @@ class RubyShell
     # Bind ALT-Right to call rl_dir_forward
     RbReadline.rl_bind_keyseq_if_unbound("\e[3C", :rl_dir_forward)
     RbReadline.rl_bind_keyseq_if_unbound("\e[3D", :rl_dir_back)
+    RbReadline.rl_bind_keyseq_if_unbound("\e[3A", :rl_dir_up)
     RbReadline.rl_bind_keyseq_if_unbound("\e[1;3C", :rl_dir_forward)
     RbReadline.rl_bind_keyseq_if_unbound("\e[1;3D", :rl_dir_back)
+    RbReadline.rl_bind_keyseq_if_unbound("\e[1;3A", :rl_dir_up)
 
     Readline.completion_append_character = " "
     Readline.completion_proc = Proc.new do |str|
@@ -192,6 +200,10 @@ class RubyShell
       puts
     elsif tokens.first == "cdb"
       @dirhistory.back
+      puts
+    elsif tokens.first == "cdup"
+      Dir.chdir ".."
+      @dirhistory.cd File.absolute_path(Dir.pwd)
       puts
     elsif tokens.first == "jobs"
       @job_control.processes.each do |pid, job_process|
