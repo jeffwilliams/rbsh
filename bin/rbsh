@@ -132,30 +132,34 @@ class RubyShell
 
 
     while true
-      @job_control.update_job_status do |job_process|
-        notify_job_status(job_process)
-      end
+      begin
+        @job_control.update_job_status do |job_process|
+          notify_job_status(job_process)
+        end
 
-      #puts "#{@dirhistory.to_s}"
-      line = nil
-      line = Readline.readline(prompt, true)
+        line = nil
+        line = Readline.readline(prompt, true)
 
-      # Exit on EOF
-      break if ! line
+        # Exit on EOF
+        break if ! line
 
-      line.strip!
-      next if line.length == 0
+        line.strip!
+        next if line.length == 0
 
-      tokens = line.split(/\s+/)
+        tokens = line.split(/\s+/)
 
-      next if check_and_handle_builtin(tokens)
+        next if check_and_handle_builtin(tokens)
 
-      if line[0,1] == '!'
-        line = line[1,line.length]
-        result = eval line
-        puts result
-      else
-        run_cmd line
+        if line[0,1] == '!'
+          line = line[1,line.length]
+          result = eval line
+          puts result
+        else
+          run_cmd line
+        end
+      rescue Exception
+        puts "#{$shell_name}: #{$!}"
+        puts $!.backtrace.join "\n" if $verbose
       end
     end
 
@@ -172,13 +176,8 @@ class RubyShell
       cmd = $1
     end
 
-    begin
-      job_process = @job_control.launch_process(cmd, state)
-      notify_job_status(job_process)
-    rescue
-      puts "#{$shell_name}: #{$!}"
-      puts $!.backtrace.join "\n" if $verbose
-    end
+    job_process = @job_control.launch_process(cmd, state)
+    notify_job_status(job_process)
   end
 
   def check_and_handle_builtin(tokens)
