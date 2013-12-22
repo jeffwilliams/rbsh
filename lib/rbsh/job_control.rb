@@ -68,9 +68,11 @@ module Rbsh
       @id_generator = IdGenerator.new
 
       @processes = {}
+      @last_stopped_job_pid = nil
     end
 
     attr_accessor :processes
+    attr_accessor :last_stopped_job_pid
 
     # Fork and start a process in the foreground. Returns the JobProcess
     # representing the new process.
@@ -129,6 +131,7 @@ module Rbsh
       remove.each do |j| 
         @processes.delete j.pid
         @id_generator.recycle j.id
+        @last_stopped_job_pid = nil if @last_stopped_job_pid == j.pid
       end
     end
 
@@ -145,6 +148,8 @@ module Rbsh
       rescue Errno::ECHILD
         puts "Child exited before wait: #{$!}"
       end
+
+      @last_stopped_job_pid = pid if $?.stopped?
 
       # Get control of terminal back to the shell
       Termios.tcsetpgrp $stdin, Process.pid
