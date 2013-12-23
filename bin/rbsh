@@ -125,7 +125,9 @@ class RubyShell
         else
           # Complete for file
           str = replace_tilde_with_homedir(str)
-          Dir[str+'*'].grep( /^#{Regexp.escape(str)}/ ).collect!{|e| e + "/"}
+          Dir[str+'*'].grep( /^#{Regexp.escape(str)}/ ).collect! do |e| 
+            File.directory?(e) ? e + "/" : e
+          end
         end
       else
         []
