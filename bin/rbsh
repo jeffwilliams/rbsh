@@ -203,14 +203,14 @@ class RubyShell
       exit 0
     elsif tokens.first == "cd"
       begin
-        if tokens.length > 0
+        if tokens.length > 1
           if File.directory?(tokens[1])
             Dir.chdir tokens[1]
           else
             puts "no such directory"
           end
         else
-          Dir.chdir
+          Dir.chdir ENV['HOME']
         end
         @dirhistory.cd File.absolute_path(Dir.pwd)
       rescue Errno::ENOENT
