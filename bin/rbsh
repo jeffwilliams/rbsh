@@ -204,7 +204,11 @@ class RubyShell
     elsif tokens.first == "cd"
       begin
         if tokens.length > 0
-          Dir.chdir tokens[1]
+          if File.directory?(tokens[1])
+            Dir.chdir tokens[1]
+          else
+            puts "no such directory"
+          end
         else
           Dir.chdir
         end
@@ -295,9 +299,9 @@ class RubyShell
 
   def complete_command_with_dir(cmd)
     dirname = File.dirname(cmd + " ")
-    Dir.entries(dirname).collect{ |e| dirname + '/' + e}.find_all do |e| 
+    r = Dir.entries(dirname).collect{ |e| dirname + '/' + e}.find_all do |e| 
       if e != "." && e != ".." 
-        File.executable?(e) && ! File.directory?(e)
+        File.executable?(e) && ! File.directory?(e) && e[0,cmd.length] == cmd
       else
         false
       end
