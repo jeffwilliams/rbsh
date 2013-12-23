@@ -44,18 +44,13 @@ module Rbsh
       # the parent shell to do this. If the subshell is continued again, it should repeat the check and stop itself 
       # again if it is still not in the foreground. "
       while Termios.tcgetpgrp($stdin) != Process.getpgrp
+        puts "#{$shell_name}: shell is not foreground. Stopping." if $verbose
         Process.kill("TTIN", 0)
       end
 
-      # Put ourself in our own process group
-      Process.setpgid Process.pid, Process.pid
-      # Get control of terminal
-      Termios.tcsetpgrp $stdin, Process.pid
-      # Save default terminal attributes for shell
-      @default_term_attrs = Termios.tcgetattr($stdin)
-
-
       # Ignore interactive and job-control signals.
+      # Note that we must ignore TTIN specifically before calling tcsetpgrp or we will get 
+      # a TTIN signal since when we change our pgid we are not necessarily be the foreground pgid anymore.
       Signal.trap('INT', 'SIG_IGN');
       Signal.trap('QUIT', 'SIG_IGN');
       Signal.trap('TSTP', 'SIG_IGN');
@@ -64,6 +59,13 @@ module Rbsh
       # The GNU libc documentation mentions that shells should ignore SIG_CHLD, but it seems
       # to cause waitpid to not work correctly (it returns -1 ECHILD even when there are children)
       #Signal.trap('CHLD', 'SIG_IGN');
+
+      # Put ourself in our own process group
+      Process.setpgid Process.pid, Process.pid
+      # Get control of terminal
+      Termios.tcsetpgrp $stdin, Process.pid
+      # Save default terminal attributes for shell
+      @default_term_attrs = Termios.tcgetattr($stdin)
 
       @id_generator = IdGenerator.new
 
