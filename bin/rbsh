@@ -116,12 +116,14 @@ class RubyShell
     RbReadline.rl_bind_keyseq_if_unbound("\e[1;3A", :rl_dir_up)
 
     Readline.completion_append_character = ""
+    # Allow $ inside words so that we can tell if we are replacing an env var
+    Readline.completer_word_break_characters = Readline.basic_word_break_characters.tr "$",""
     Readline.completion_proc = Proc.new do |str|
       if Readline.point > 0
         
-        if Readline.line_buffer[Readline.point-2,1] == '$'
+        if str =~ /\$(\w+)/
           # Complete the environment variable
-          ENV.collect{ |k,v| k}.find_all{ |k,v| k[0,str.length] == str }
+          ENV.collect{ |k,v| "$#{k}"}.find_all{ |k,v| k[0,str.length] == str }
         else
           completing_first_word = Readline.line_buffer[0,Readline.point].index(' ').nil?
 
