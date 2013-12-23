@@ -4,11 +4,11 @@
 # rb-readline gem. Tested with version 0.5.
 require 'rb-readline'
 require 'etc'
-require 'Termcolor'
 # ruby-termios. 0.9.6
 require 'termios'
 require 'getoptlong'
 require 'rbsh/job_control'
+require 'rbsh/termcolor'
 
 include Rbsh
 
@@ -99,6 +99,7 @@ class RubyShell
     @dirhistory = DirHistory.new
     @default_term_attrs = nil
     @builtins = %w(exit cd cdf cdb jobs fg)
+    @color = TermColor.new
   end
 
   def run
@@ -113,7 +114,7 @@ class RubyShell
     RbReadline.rl_bind_keyseq_if_unbound("\e[1;3D", :rl_dir_back)
     RbReadline.rl_bind_keyseq_if_unbound("\e[1;3A", :rl_dir_up)
 
-    Readline.completion_append_character = " "
+    Readline.completion_append_character = ""
     Readline.completion_proc = Proc.new do |str|
       if Readline.point > 0
         
@@ -123,7 +124,7 @@ class RubyShell
           complete_command(str)
         else
           # Complete for file
-          Dir[str+'*'].grep( /^#{Regexp.escape(str)}/ )     
+          Dir[str+'*'].grep( /^#{Regexp.escape(str)}/ ).collect!{|e| e + "/"}
         end
       else
         []
@@ -267,6 +268,10 @@ class RubyShell
       end
       matches = matches.concat(m.compact)
     end
+    
+    # Append space to commands so that user can keep typing
+    matches.collect!{ |e| e + " "}
+    
     matches
   end
 
@@ -275,9 +280,8 @@ class RubyShell
   end
 
   def prompt
-    p = "{196}#{Etc.getlogin}@#{`hostname -s`.chomp}{d}:{c}#{replace_homedir_with_tilde(Dir.pwd)}{d}$ "
-    color = Termcolorizer.new
-    color.colorizeWithEscapes(p)
+    p = "{124}#{Etc.getlogin}@#{`hostname -s`.chomp}{d}:{29}#{replace_homedir_with_tilde(Dir.pwd)}{d}$ "
+    @color.colorize_with_escapes(p)
   end
 
 end
