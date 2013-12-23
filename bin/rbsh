@@ -1,4 +1,4 @@
-#!/usr/bin/env ruby1.9.1
+#!/usr/bin/env ruby
 # http://www.gnu.org/software/libc/manual/html_node/Implementing-a-Shell.html
 
 # rb-readline gem. Tested with version 0.5.
@@ -124,6 +124,7 @@ class RubyShell
           complete_command(str)
         else
           # Complete for file
+          str = replace_tilde_with_homedir(str)
           Dir[str+'*'].grep( /^#{Regexp.escape(str)}/ ).collect!{|e| e + "/"}
         end
       else
@@ -277,6 +278,9 @@ class RubyShell
 
   def replace_homedir_with_tilde(path)
     path.gsub(ENV["HOME"],'~')
+  end
+  def replace_tilde_with_homedir(path)
+    path.gsub('~',ENV["HOME"])
   end
 
   def prompt
