@@ -60,7 +60,15 @@ module Rbsh
       # to cause waitpid to not work correctly (it returns -1 ECHILD even when there are children)
       #Signal.trap('CHLD', 'SIG_IGN');
 
-      # Put ourself in our own process group
+      # Put ourself in our own process group. 
+      # If we are the session leader (sid == pid) this call will fail, but it is not necessary (since
+      # we are already in our own process group). The correct way to check this would be to call getsid,
+      # but that is not available in ruby 1.9. Instead we catch EPERM and assume that it was thrown for this reason.
+      begin
+        Process.setpgid Process.pid, Process.pid
+      rescue Errno::EPERM
+      end
+
       Process.setpgid Process.pid, Process.pid
       # Get control of terminal
       Termios.tcsetpgrp $stdin, Process.pid
