@@ -7,6 +7,7 @@ require 'etc'
 # ruby-termios. 0.9.6
 require 'termios'
 require 'getoptlong'
+require 'pp'
 require 'rbsh/job_control'
 require 'rbsh/termcolor'
 
@@ -118,15 +119,20 @@ class RubyShell
     Readline.completion_proc = Proc.new do |str|
       if Readline.point > 0
         
-        completing_first_word = Readline.line_buffer[0,Readline.point].index(' ').nil?
-
-        if completing_first_word
-          complete_command(str)
+        if Readline.line_buffer[Readline.point-2,1] == '$'
+          # Complete the environment variable
+          ENV.collect{ |k,v| k}.find_all{ |k,v| k[0,str.length] == str }
         else
-          # Complete for file
-          str = replace_tilde_with_homedir(str)
-          Dir[str+'*'].grep( /^#{Regexp.escape(str)}/ ).collect! do |e| 
-            File.directory?(e) ? e + "/" : e
+          completing_first_word = Readline.line_buffer[0,Readline.point].index(' ').nil?
+
+          if completing_first_word
+            complete_command(str)
+          else
+            # Complete for file
+            str = replace_tilde_with_homedir(str)
+            Dir[str+'*'].grep( /^#{Regexp.escape(str)}/ ).collect! do |e| 
+              File.directory?(e) ? e + "/" : e
+            end
           end
         end
       else
@@ -157,8 +163,13 @@ class RubyShell
         if line[0,1] == '!'
           line = line[1,line.length]
           result = eval line
-          puts result
+          if result.is_a? String
+            puts result
+          else
+            pp result
+          end
         else
+          line = expand_parameters(line)
           run_cmd line
         end
       rescue Exception
@@ -248,7 +259,6 @@ class RubyShell
   end
 
   def complete_command(cmd)
-    #matches = Array.new(@builtins)
     matches = []
     m = @builtins.collect do |e|
       if e[0,cmd.length] == cmd
@@ -281,8 +291,14 @@ class RubyShell
   def replace_homedir_with_tilde(path)
     path.gsub(ENV["HOME"],'~')
   end
+
   def replace_tilde_with_homedir(path)
     path.gsub('~',ENV["HOME"])
+  end
+
+  # Perform $ expansion
+  def expand_parameters(str)
+    str.gsub(/\$(\w+)/){ENV[$1]}
   end
 
   def prompt
