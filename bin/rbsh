@@ -261,6 +261,9 @@ class RubyShell
   end
 
   def complete_command(cmd)
+
+    return complete_command_with_dir(cmd) if cmd.index("/")
+
     matches = []
     m = @builtins.collect do |e|
       if e[0,cmd.length] == cmd
@@ -288,6 +291,17 @@ class RubyShell
     matches.collect!{ |e| e + " "}
     
     matches
+  end
+
+  def complete_command_with_dir(cmd)
+    dirname = File.dirname(cmd + " ")
+    Dir.entries(dirname).collect{ |e| dirname + '/' + e}.find_all do |e| 
+      if e != "." && e != ".." 
+        File.executable?(e) && ! File.directory?(e)
+      else
+        false
+      end
+    end
   end
 
   def replace_homedir_with_tilde(path)
