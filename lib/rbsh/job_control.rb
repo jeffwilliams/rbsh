@@ -69,7 +69,6 @@ module Rbsh
       rescue Errno::EPERM
       end
 
-      Process.setpgid Process.pid, Process.pid
       # Get control of terminal
       Termios.tcsetpgrp $stdin, Process.pid
       # Save default terminal attributes for shell
