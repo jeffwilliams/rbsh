@@ -8,12 +8,14 @@ module Rbsh
       @pid = pid
       @status = status
       @fg_or_bg = :foreground
+      @term_attrs = nil
     end
     
     attr_accessor :id
     attr_accessor :cmd
     attr_accessor :pid
     attr_accessor :fg_or_bg
+    attr_accessor :term_attrs
 
     def completed?
       @status == :completed
@@ -148,7 +150,12 @@ module Rbsh
       # Give control of terminal to job 
       Termios.tcsetpgrp $stdin, pid
 
-      Process.kill("SIGCONT", -pid) if cont
+      job_process = @processes[pid]
+
+      if cont
+        Termios.tcsetattr($stdin, Termios::TCSADRAIN, job_process.term_attrs) if job_process && job_process.term_attrs
+        Process.kill("SIGCONT", -pid)
+      end
 
       # Wait for the pid. It will either complete or get stopped
       pid = nil
@@ -162,8 +169,13 @@ module Rbsh
 
       # Get control of terminal back to the shell
       Termios.tcsetpgrp $stdin, Process.pid
-      @processes[pid].set_status_from_process_status($?) if @processes[pid]
-      @processes[pid]
+
+      if job_process
+        job_process.term_attrs = Termios.tcgetattr($stdin)
+        Termios.tcsetattr($stdin, Termios::TCSADRAIN, @default_term_attrs)
+        job_process.set_status_from_process_status($?)
+      end
+      job_process
     end
 
     def put_in_background(pid, cont = false)
