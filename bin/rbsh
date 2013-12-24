@@ -97,6 +97,8 @@ end
 
 class RubyShell
 
+  RCFILE = "#{ENV['HOME']}/.rbshrc"
+
   def initialize
     @dirhistory = DirHistory.new
     @default_term_attrs = nil
@@ -107,6 +109,8 @@ class RubyShell
     @dirhistory.cd File.absolute_path(Dir.pwd)
     @job_control = JobControl.new
     @builtins = Builtins.new(@dirhistory, @job_control, method(:notify_job_status))
+
+    source_script(RCFILE) if File.exists?(RCFILE)
 
     # Bind ALT-Right to call rl_dir_forward
     RbReadline.rl_bind_keyseq_if_unbound("\e[3C", :rl_dir_forward)
@@ -279,6 +283,14 @@ class RubyShell
   # Perform $ expansion
   def expand_parameters(str)
     str.gsub(/\$(\w+)/){ENV[$1]}
+  end
+
+  def source_script(path)
+    begin
+      eval File.read(path), binding, path
+    rescue Exception
+      puts "#{$shell_name}: sourcing script #{path} failed: #{$!}"
+    end
   end
 
   def expand_ruby(str)
