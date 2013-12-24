@@ -11,6 +11,7 @@ require 'pp'
 require 'rbsh/job_control'
 require 'rbsh/termcolor'
 require 'rbsh/builtins'
+require 'rbsh/tokenizer'
 
 include Rbsh
 
@@ -154,7 +155,6 @@ class RubyShell
       end
     end
 
-
     while true
       begin
         @job_control.update_job_status do |job_process|
@@ -170,7 +170,7 @@ class RubyShell
         line.strip!
         next if line.length == 0
 
-        tokens = line.split(/\s+/)
+        tokens = Tokenizer.tokenize line
 
         next if check_and_handle_builtin(tokens)
 
