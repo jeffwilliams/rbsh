@@ -179,7 +179,7 @@ class RubyShell
             pp result
           end
         else
-          line = expand_parameters(line)
+          line = expand_ruby(expand_parameters(line))
           run_cmd line
         end
       rescue Exception
@@ -279,6 +279,10 @@ class RubyShell
   # Perform $ expansion
   def expand_parameters(str)
     str.gsub(/\$(\w+)/){ENV[$1]}
+  end
+
+  def expand_ruby(str)
+    str.gsub(/!([^!]+)!/){eval($1).to_s}
   end
 
   def prompt
