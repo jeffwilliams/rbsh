@@ -172,7 +172,10 @@ class RubyShell
         end
 
         line.strip!
-        next if line.length == 0
+        if line.length == 0
+          Readline::History.pop
+          next
+        end
 
         line = expand(line)
         tokens = Tokenizer.tokenize line
