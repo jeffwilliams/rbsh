@@ -165,7 +165,10 @@ class RubyShell
         line = Readline.readline(prompt, true)
 
         # Exit on EOF
-        break if ! line
+        if ! line
+          @builtins.exit
+          next
+        end
 
         line.strip!
         next if line.length == 0

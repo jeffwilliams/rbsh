@@ -4,10 +4,17 @@ module Rbsh
       @dirhistory = dirhistory
       @job_control = job_control
       @notify_job_status_proc = notify_job_status_proc
+      @warned_stopped_jobs_on_exit = false
     end 
    
     def exit
-      Kernel.exit! 0
+      stopped = @job_control.processes.find{ |pid, j| j.stopped? && j.fg_or_bg == :foreground }
+      if stopped && !@warned_stopped_jobs_on_exit
+        puts "There are stopped jobs."
+        @warned_stopped_jobs_on_exit = true
+      else
+        Kernel.exit! 0
+      end
     end
 
     def cd(*args)
