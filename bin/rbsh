@@ -107,6 +107,7 @@ class RubyShell
   end
 
   def run
+    puts "Shell pid: #{Process.pid}" if $verbose
     @dirhistory.cd File.absolute_path(Dir.pwd)
     @job_control = JobControl.new
     @builtins = Builtins.new(@dirhistory, @job_control, method(:notify_job_status))
@@ -184,12 +185,7 @@ class RubyShell
 
         if line[0,1] == '!'
           line = line[1,line.length]
-          result = eval line
-          if result.is_a? String
-            puts result
-          else
-            pp result
-          end
+          run_ruby(line)
         else
           run_cmd line
         end
@@ -214,6 +210,34 @@ class RubyShell
 
     job_process = @job_control.launch_process(cmd, state)
     notify_job_status(job_process)
+  end
+
+  def run_ruby(line)
+    # When running ruby, the user may cause infinite loops or 
+    # other problems and want to cancel. To allow this we run 
+    # the ruby in a new thread and wait for the threads completion.
+    # If the user sends SIGINT, we kill the thread.
+  
+    result = nil
+    t = Thread.new do
+      result = eval line
+      if result.is_a? String
+        puts result
+      else
+        pp result
+      end
+    end
+
+    Signal.trap('INT') do
+      t.kill
+    end
+  
+    begin
+      t.join
+    ensure
+      Signal.trap('INT', 'SIG_IGN');
+    end
+    result
   end
 
   def check_and_handle_builtin(tokens)
@@ -294,7 +318,7 @@ class RubyShell
   end
 
   def expand_ruby(str)
-    str.gsub(/!([^!]+)!/){eval($1).to_s}
+    str.gsub(/!([^!]+)!/){run_ruby($1).to_s}
   end
 
   def expand(str)
