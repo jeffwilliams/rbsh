@@ -301,7 +301,8 @@ class RubyShell
   end
 
   def prompt
-    p = "{124}#{Etc.getlogin}@#{`hostname -s`.chomp}{d}:{29}#{replace_homedir_with_tilde(Dir.pwd)}{d}$ "
+    # rb-readline expects non-visible characters to be enclosed between the characters \x01 and \x02. 
+    p = "\x01{124}\x02#{Etc.getlogin}@#{`hostname -s`.chomp}\x01{d}\x02:\x01{29}\x02#{replace_homedir_with_tilde(Dir.pwd)}\x01{d}\x02$ "
     @color.colorize_with_escapes(p)
   end
 
