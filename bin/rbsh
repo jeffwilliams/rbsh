@@ -133,6 +133,7 @@ class RubyShell
     Readline.completer_word_break_characters = Readline.basic_word_break_characters.tr "$",""
     Readline.completion_proc = Proc.new do |str|
       if Readline.point > 0
+        str = replace_tilde_with_homedir(str)
         
         if str =~ /\$(\w+)/
           # Complete the environment variable
@@ -173,6 +174,7 @@ class RubyShell
         line.strip!
         next if line.length == 0
 
+        line = expand(line)
         tokens = Tokenizer.tokenize line
 
         next if check_and_handle_builtin(tokens)
@@ -186,7 +188,6 @@ class RubyShell
             pp result
           end
         else
-          line = expand_ruby(expand_parameters(line))
           run_cmd line
         end
       rescue Exception
@@ -268,11 +269,12 @@ class RubyShell
     dirname = File.dirname(cmd + " ")
     r = Dir.entries(dirname).collect{ |e| dirname + '/' + e}.find_all do |e| 
       if e != "." && e != ".." 
-        File.executable?(e) && ! File.directory?(e) && e[0,cmd.length] == cmd
+        (File.executable?(e) || File.directory?(e)) && e[0,cmd.length] == cmd
       else
         false
       end
     end
+    r
   end
 
   def replace_homedir_with_tilde(path)
@@ -288,16 +290,20 @@ class RubyShell
     str.gsub(/\$(\w+)/){ENV[$1]}
   end
 
+  def expand_ruby(str)
+    str.gsub(/!([^!]+)!/){eval($1).to_s}
+  end
+
+  def expand(str)
+    replace_tilde_with_homedir(expand_parameters(expand_ruby(str)))
+  end
+
   def source_script(path)
     begin
       eval File.read(path), binding, path
     rescue Exception
       puts "#{$shell_name}: sourcing script #{path} failed: #{$!}"
     end
-  end
-
-  def expand_ruby(str)
-    str.gsub(/!([^!]+)!/){eval($1).to_s}
   end
 
   def prompt
