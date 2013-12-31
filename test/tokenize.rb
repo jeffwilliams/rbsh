@@ -74,7 +74,7 @@ class TestTokenizer < MiniTest::Unit::TestCase
 
   def testSplit1
     toker = Rbsh::Tokenizer.new 
-    tokens = toker.split(toker.tokenize("heres my | pipeline | of pain"), "|")
+    tokens = Rbsh::Tokenizer.split(toker.tokenize("heres my | pipeline | of pain"), "|")
     
     assert_equal 3, tokens.size, "result is #{tokens}"
     assert_equal ['heres','my'], tokens[0]
@@ -84,7 +84,7 @@ class TestTokenizer < MiniTest::Unit::TestCase
 
   def testSplit2
     toker = Rbsh::Tokenizer.new 
-    tokens = toker.split(toker.tokenize("heres my | pipeline | "), "|")
+    tokens = Rbsh::Tokenizer.split(toker.tokenize("heres my | pipeline | "), "|")
     
     assert_equal 3, tokens.size, "result is #{tokens}"
     assert_equal ['heres','my'], tokens[0]
@@ -94,7 +94,7 @@ class TestTokenizer < MiniTest::Unit::TestCase
 
   def testSplit3
     toker = Rbsh::Tokenizer.new 
-    tokens = toker.split(toker.tokenize("heres my cmd"), "|")
+    tokens = Rbsh::Tokenizer.split(toker.tokenize("heres my cmd"), "|")
     
     assert_equal 1, tokens.size, "result is #{tokens}"
     assert_equal ['heres','my', 'cmd'], tokens[0]

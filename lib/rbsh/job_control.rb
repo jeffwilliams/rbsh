@@ -1,13 +1,16 @@
 require 'rbsh/id_generator'
+require 'rbsh/tokenizer'
 
 module Rbsh
   # A command line for a single process (i.e. without pipes)
   class CmdLine
-    def initialize(cmd)
+    def initialize(tokens)
       @argv = []
       @stdin_redirect = nil
       @stdout_redirect = nil
       @stderr_redirect = nil
+
+      parse_tokens(tokens)
     end
 
     attr_accessor :argv
@@ -15,9 +18,59 @@ module Rbsh
     attr_accessor :stdout_redirect
     attr_accessor :stderr_redirect
 
-    private 
-    def parse(cmd)
+    private
+    def parse_tokens(tokens)
+      last = nil
+      mode = nil
+      tokens.each do |token|
+        if token == '>'
+          if mode == :maybe_fd_redir
+            mode = :redir_stderr
+          else
+            mode = :redir_stdout
+          end
+        elsif token == '<'
+          mode = :redir_stdin
+        elsif token =~ /^\d+$/
+          mode = :maybe_fd_redir
+        else
+          if mode == :redir_stdout
+            raise "invalid stdout redirection: only one filename allowed." if @stdout_redirect
+            @stdout_redirect = token
+          elsif mode == :redir_stderr
+            raise "invalid stderr redirection: only one filename allowed." if @stderr_redirect
+            @stderr_redirect = token
+          elsif mode == :redir_stdin
+            raise "invalid stdin redirection: only one filename allowed." if @stdin_redirect
+            @stdin_redirect = token
+          else
+            @argv.push token
+          end
+        end
+        last = token
+      end
     end
+  end
+
+  # A command line representing a full pipeline
+  class Pipeline
+    def initialize(cmd)
+      tokens = Tokenizer.new.tokenize(cmd)
+      cmd_lines = Tokenizer.split tokens, "|"
+      @cmd_lines = cmd_lines.collect{ |cmd_line| CmdLine.new cmd_line }
+      if @cmd_lines.size > 1
+        @cmd_lines[1..(@cmd_lines.size-1)].each do |c|
+          raise "invalid stdin redirection: cannot redirect when input is from pipe" if c.stdin_redirect
+        end
+        @cmd_lines[0..(@cmd_lines.size-2)].each do |c|
+          raise "invalid stdout redirection: cannot redirect when output is to pipe" if c.stdout_redirect
+        end
+      end
+    end
+
+    # An array of each single process command line. These are joined together with pipes.
+    attr_accessor :cmd_lines
+
   end
 
   # A pipeline of processes 
@@ -40,7 +93,6 @@ module Rbsh
     attr_accessor :term_attrs
     attr_accessor :stdin, :stdout, :stderr
     attr_accessor :processes
-
   end
 
   # A single process
@@ -49,13 +101,11 @@ module Rbsh
       @cmd = cmd
       @pid = pid
       @status = status
-      @fg_or_bg = :foreground
       @term_attrs = nil
     end
     
     attr_accessor :cmd
     attr_accessor :pid
-    attr_accessor :fg_or_bg
     attr_accessor :term_attrs
 
     def completed?
@@ -126,8 +176,12 @@ module Rbsh
     attr_accessor :processes
     attr_accessor :last_stopped_job_pid
 
-    # Fork and start a process in the foreground. Returns the JobProcess
-    # representing the new process.
+    # Start a pipeline
+    def launch_job(cmd, fg_or_bg = :foreground)
+      infile = $stdin
+       
+    end
+
     def launch_process(cmd, fg_or_bg = :foreground)
       child_pid = Process.fork do
         # This process starts as a new process group
