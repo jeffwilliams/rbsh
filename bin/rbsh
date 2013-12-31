@@ -12,6 +12,7 @@ require 'rbsh/job_control'
 require 'rbsh/termcolor'
 require 'rbsh/builtins'
 require 'rbsh/tokenizer'
+require 'rbsh/context'
 
 include Rbsh
 
@@ -104,6 +105,7 @@ class RubyShell
     @dirhistory = DirHistory.new
     @default_term_attrs = nil
     @color = TermColor.new
+    @context = Context.new
   end
 
   def run
@@ -136,7 +138,10 @@ class RubyShell
       if Readline.point > 0
         str = replace_tilde_with_homedir(str)
         
-        if str =~ /\$(\w+)/
+        if Readline.line_buffer =~ /^\w*!/ || str[0] == '!'
+          # Complete ruby
+          complete_ruby(str)
+        elsif str =~ /\$(\w+)/
           # Complete the environment variable
           ENV.collect{ |k,v| "$#{k}"}.find_all{ |k,v| k[0,str.length] == str }
         else
@@ -221,7 +226,7 @@ class RubyShell
   
     result = nil
     t = Thread.new do
-      result = eval line
+      result = eval line, @context.get_binding
       if result.is_a? String
         puts result
       else
@@ -305,6 +310,17 @@ class RubyShell
     r
   end
 
+  def complete_ruby(str)
+    if str == '!'
+      r = @context.public_methods(false).collect{ |m| "!" + m.to_s }
+      r
+    elsif str[0] == '!'
+      @context.public_methods(false).find_all{ |m| m.to_s.index(str[1,str.length]) == 0 }.collect{ |m| "!" + m.to_s }
+    else
+      []
+    end
+  end
+
   def replace_homedir_with_tilde(path)
     path.gsub(ENV["HOME"],'~')
   end
@@ -328,7 +344,7 @@ class RubyShell
 
   def source_script(path)
     begin
-      eval File.read(path), binding, path
+      eval File.read(path), @context.get_binding, path
     rescue Exception
       puts "#{$shell_name}: sourcing script #{path} failed: #{$!}"
     end
