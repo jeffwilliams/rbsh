@@ -1,14 +1,14 @@
 #!/usr/bin/env ruby 
 require 'minitest/unit'
 require 'minitest/autorun'
-require 'lib/rbsh/tokenizer'
+require './lib/rbsh/tokenizer'
 
 class TestTokenizer < MiniTest::Unit::TestCase
   def setup
   end
 
   def test1
-    tokens = Rbsh::Tokenizer.tokenize("a test string")
+    tokens = Rbsh::Tokenizer.new.tokenize("a test string")
     assert_equal 3, tokens.size
     assert_equal 'a', tokens[0]
     assert_equal 'test', tokens[1]
@@ -16,7 +16,7 @@ class TestTokenizer < MiniTest::Unit::TestCase
   end
 
   def test2
-    tokens = Rbsh::Tokenizer.tokenize("a    test       string        ")
+    tokens = Rbsh::Tokenizer.new.tokenize("a    test       string        ")
     assert_equal 3, tokens.size
     assert_equal 'a', tokens[0]
     assert_equal 'test', tokens[1]
@@ -24,14 +24,14 @@ class TestTokenizer < MiniTest::Unit::TestCase
   end
 
   def test3
-    tokens = Rbsh::Tokenizer.tokenize("a 'test string'")
+    tokens = Rbsh::Tokenizer.new.tokenize("a 'test string'")
     assert_equal 2, tokens.size, "result is #{tokens}"
     assert_equal 'a', tokens[0]
     assert_equal 'test string', tokens[1]
   end
 
   def test4
-    tokens = Rbsh::Tokenizer.tokenize("a     'test string'  of power")
+    tokens = Rbsh::Tokenizer.new.tokenize("a     'test string'  of power")
     assert_equal 4, tokens.size, "result is #{tokens}"
     assert_equal 'a', tokens[0]
     assert_equal 'test string', tokens[1]
@@ -40,7 +40,7 @@ class TestTokenizer < MiniTest::Unit::TestCase
   end
 
   def test5
-    tokens = Rbsh::Tokenizer.tokenize("a 'inner \" quoted' string")
+    tokens = Rbsh::Tokenizer.new.tokenize("a 'inner \" quoted' string")
     assert_equal 3, tokens.size, "result is #{tokens}"
     assert_equal 'a', tokens[0]
     assert_equal 'inner " quoted', tokens[1]
@@ -48,9 +48,55 @@ class TestTokenizer < MiniTest::Unit::TestCase
   end
 
   def test6
-    tokens = Rbsh::Tokenizer.tokenize("no 'end terminator")
+    tokens = Rbsh::Tokenizer.new.tokenize("no 'end terminator")
     assert_equal 2, tokens.size, "result is #{tokens}"
     assert_equal 'no', tokens[0]
     assert_equal 'end terminator', tokens[1]
+  end
+
+  def test7
+    tokens = Rbsh::Tokenizer.new.tokenize("heres my|pipeline")
+    assert_equal 4, tokens.size, "result is #{tokens}"
+    assert_equal 'heres', tokens[0]
+    assert_equal 'my', tokens[1]
+    assert_equal '|', tokens[2]
+    assert_equal 'pipeline', tokens[3]
+  end
+
+  def test8
+    tokens = Rbsh::Tokenizer.new.tokenize("heres my | pipeline")
+    assert_equal 4, tokens.size, "result is #{tokens}"
+    assert_equal 'heres', tokens[0]
+    assert_equal 'my', tokens[1]
+    assert_equal '|', tokens[2]
+    assert_equal 'pipeline', tokens[3]
+  end
+
+  def testSplit1
+    toker = Rbsh::Tokenizer.new 
+    tokens = toker.split(toker.tokenize("heres my | pipeline | of pain"), "|")
+    
+    assert_equal 3, tokens.size, "result is #{tokens}"
+    assert_equal ['heres','my'], tokens[0]
+    assert_equal ['pipeline'], tokens[1]
+    assert_equal ['of','pain'], tokens[2]
+  end
+
+  def testSplit2
+    toker = Rbsh::Tokenizer.new 
+    tokens = toker.split(toker.tokenize("heres my | pipeline | "), "|")
+    
+    assert_equal 3, tokens.size, "result is #{tokens}"
+    assert_equal ['heres','my'], tokens[0]
+    assert_equal ['pipeline'], tokens[1]
+    assert_equal [], tokens[2]
+  end
+
+  def testSplit3
+    toker = Rbsh::Tokenizer.new 
+    tokens = toker.split(toker.tokenize("heres my cmd"), "|")
+    
+    assert_equal 1, tokens.size, "result is #{tokens}"
+    assert_equal ['heres','my', 'cmd'], tokens[0]
   end
 end

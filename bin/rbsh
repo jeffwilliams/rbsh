@@ -157,6 +157,7 @@ class RubyShell
       end
     end
 
+    tokenizer = Tokenizer.new
     while true
       begin
         @job_control.update_job_status do |job_process|
@@ -179,7 +180,7 @@ class RubyShell
         end
 
         line = expand(line)
-        tokens = Tokenizer.tokenize line
+        tokens = tokenizer.tokenize line
 
         next if check_and_handle_builtin(tokens)
 
