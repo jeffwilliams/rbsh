@@ -1,9 +1,51 @@
 require 'rbsh/id_generator'
 
 module Rbsh
-  class JobProcess
-    def initialize(id, cmd, pid, status)
+  # A command line for a single process (i.e. without pipes)
+  class CmdLine
+    def initialize(cmd)
+      @argv = []
+      @stdin_redirect = nil
+      @stdout_redirect = nil
+      @stderr_redirect = nil
+    end
+
+    attr_accessor :argv
+    attr_accessor :stdin_redirect
+    attr_accessor :stdout_redirect
+    attr_accessor :stderr_redirect
+
+    private 
+    def parse(cmd)
+    end
+  end
+
+  # A pipeline of processes 
+  class Job
+    def initialize(id, cmd, status)
       @id = id
+      @cmd = cmd
+      @pgid = nil
+      @fg_or_bg = :foreground
+      @term_attrs = nil
+      @stdin = $stdin
+      @stdout = $stdout
+      @stderr = $stderr
+    end
+    
+    attr_accessor :id
+    attr_accessor :cmd
+    attr_accessor :pgid
+    attr_accessor :fg_or_bg
+    attr_accessor :term_attrs
+    attr_accessor :stdin, :stdout, :stderr
+    attr_accessor :processes
+
+  end
+
+  # A single process
+  class JobProcess
+    def initialize(cmd, pid, status)
       @cmd = cmd
       @pid = pid
       @status = status
@@ -11,7 +53,6 @@ module Rbsh
       @term_attrs = nil
     end
     
-    attr_accessor :id
     attr_accessor :cmd
     attr_accessor :pid
     attr_accessor :fg_or_bg
