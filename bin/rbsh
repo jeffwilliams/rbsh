@@ -160,12 +160,19 @@ class RubyShell
     tokenizer = Tokenizer.new
     while true
       begin
-        @job_control.update_job_status do |job_process|
-          notify_job_status(job_process)
+        @job_control.update_job_status do |job|
+          notify_job_status(job)
         end
 
         line = nil
-        line = Readline.readline(prompt, true)
+        begin
+          line = Readline.readline(prompt, true)
+        rescue Errno::EIO
+          # Usually caused by an exception in job control that leaves 
+          # this process not the foreground process of the terminal.
+          @job_control.restore_shell
+          retry
+        end
 
         # Exit on EOF
         if ! line
@@ -191,7 +198,7 @@ class RubyShell
           run_cmd line
         end
       rescue Exception
-        puts "#{$shell_name}: #{$!}"
+        puts "#{$shell_name}: #{$!.class}: #{$!}"
         puts $!.backtrace.join "\n" if $verbose
       end
     end
@@ -209,8 +216,8 @@ class RubyShell
       cmd = $1
     end
 
-    job_process = @job_control.launch_process(cmd, state)
-    notify_job_status(job_process)
+    job = @job_control.launch_job(cmd, state)
+    notify_job_status(job)
   end
 
   def run_ruby(line)
@@ -251,11 +258,11 @@ class RubyShell
     true
   end
 
-  def notify_job_status(job_process)
-    if job_process.stopped?
-      puts "Job '#{job_process.cmd}' stopped"
+  def notify_job_status(job)
+    if job.completed?
+      puts "Job '#{job.cmd}' completed" if job.fg_or_bg == :background
     else
-      puts "Job '#{job_process.cmd}' completed" if job_process.fg_or_bg == :background
+      puts "Job '#{job.cmd}' stopped"
     end
   end
 
