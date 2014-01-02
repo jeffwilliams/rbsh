@@ -1,9 +1,22 @@
+class String
+  # If this string is a token returned from Rbsh::Tokenizer::tokenize and this
+  # token was part of a quoted string, this value is set to the quote character 
+  # ' or "
+  def rbsh_quote_type
+    (defined? @rbsh_quote_type) ? @rbsh_quote_type : nil
+  end
+
+  def rbsh_quote_type=(v)
+    @rbsh_quote_type = v
+  end
+end
+
 module Rbsh
   class Tokenizer
     def initialize
       @quote_chars = ['"',"'"]
       # Characters that are tokens by themselves
-      @token_chars = ['|','>','<']
+      @token_chars = ['|','>','<', '&']
     end
 
     def tokenize(str)
@@ -14,6 +27,7 @@ module Rbsh
             # We are in a quote.
             if quote == char
               memo.last[0] = ""
+              memo.last.rbsh_quote_type = quote
               memo.push ""
             else
               memo.last.concat char

@@ -195,7 +195,7 @@ class RubyShell
           line = line[1,line.length]
           run_ruby(line)
         else
-          run_cmd line
+          run_cmd tokens
         end
       rescue Exception
         puts "#{$shell_name}: #{$!.class}: #{$!}"
@@ -208,15 +208,15 @@ class RubyShell
 
   private
 
-  def run_cmd(cmd)
+  def run_cmd(tokens)
 
     state = :foreground
-    if cmd =~ /(.*)&$/
+    if tokens.last == '&'
       state = :background
-      cmd = $1
+      tokens.pop
     end
 
-    job = @job_control.launch_job(cmd, state)
+    job = @job_control.launch_job(tokens, state)
     notify_job_status(job)
   end
 
@@ -251,6 +251,7 @@ class RubyShell
   def check_and_handle_builtin(tokens)
     return false if tokens.size == 0
 
+    tokens = tokens.dup
     cmd = tokens.shift.to_sym
     return false if ! @builtins.respond_to?(cmd)
 
@@ -261,7 +262,7 @@ class RubyShell
   def notify_job_status(job)
     if job.completed?
       puts "Job '#{job.cmd}' completed" if job.fg_or_bg == :background
-    else
+    elsif job.stopped?
       puts "Job '#{job.cmd}' stopped"
     end
   end

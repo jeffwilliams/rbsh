@@ -27,7 +27,16 @@ class TestTokenizer < MiniTest::Unit::TestCase
     tokens = Rbsh::Tokenizer.new.tokenize("a 'test string'")
     assert_equal 2, tokens.size, "result is #{tokens}"
     assert_equal 'a', tokens[0]
+    assert tokens[0].rbsh_quote_type.nil?
     assert_equal 'test string', tokens[1]
+    assert_equal "'", tokens[1].rbsh_quote_type
+
+    tokens = Rbsh::Tokenizer.new.tokenize('a "test string"')
+    assert_equal 2, tokens.size, "result is #{tokens}"
+    assert_equal 'a', tokens[0]
+    assert tokens[0].rbsh_quote_type.nil?
+    assert_equal 'test string', tokens[1]
+    assert_equal '"', tokens[1].rbsh_quote_type
   end
 
   def test4
@@ -70,6 +79,13 @@ class TestTokenizer < MiniTest::Unit::TestCase
     assert_equal 'my', tokens[1]
     assert_equal '|', tokens[2]
     assert_equal 'pipeline', tokens[3]
+  end
+
+  def test9
+    tokens = Rbsh::Tokenizer.new.tokenize("'test my' quote")
+    assert_equal 2, tokens.size, "result is #{tokens}"
+    assert_equal 'test my', tokens[0]
+    assert_equal 'quote', tokens[1]
   end
 
   def testSplit1

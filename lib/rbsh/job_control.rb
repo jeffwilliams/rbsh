@@ -54,8 +54,11 @@ module Rbsh
 
   # A command line representing a full pipeline
   class Pipeline
+    # Create a pipeline object based on the passed command. The command may be a string or an array of strings (tokenized)
     def initialize(cmd)
-      tokens = Tokenizer.new.tokenize(cmd)
+      tokens = cmd
+      tokens = Tokenizer.new.tokenize(cmd) if ! cmd.is_a?(Array)
+
       cmd_lines = Tokenizer.split tokens, "|"
       @cmd_lines = cmd_lines.collect{ |cmd_line| CmdLine.new cmd_line }
       if @cmd_lines.size > 1
@@ -188,6 +191,7 @@ module Rbsh
     # Start a pipeline
     def launch_job(cmd, fg_or_bg = :foreground)
       pipeline = Pipeline.new(cmd)
+      cmd = cmd.join " " if cmd.is_a?(Array)
 
       infile = $stdin
       job = Job.new(@id_generator.get, cmd)
