@@ -13,6 +13,7 @@ require 'rbsh/termcolor'
 require 'rbsh/builtins'
 require 'rbsh/tokenizer'
 require 'rbsh/context'
+require 'rbsh/expansion'
 
 include Rbsh
 
@@ -113,6 +114,7 @@ class RubyShell
     @dirhistory.cd File.absolute_path(Dir.pwd)
     @job_control = JobControl.new
     @builtins = Builtins.new(@dirhistory, @job_control, method(:notify_job_status))
+    @expansion = Expansion.new(method(:run_ruby))
 
     source_script(RCFILE) if File.exists?(RCFILE)
 
@@ -136,7 +138,7 @@ class RubyShell
     Readline.completer_word_break_characters = Readline.basic_word_break_characters.tr "$",""
     Readline.completion_proc = Proc.new do |str|
       if Readline.point > 0
-        str = replace_tilde_with_homedir(str)
+        str = expand_tilde(str)
         
         if Readline.line_buffer =~ /^\w*!/ || str[0] == '!'
           # Complete ruby
@@ -151,7 +153,6 @@ class RubyShell
             complete_command(str)
           else
             # Complete for file
-            str = replace_tilde_with_homedir(str)
             Dir[str+'*'].grep( /^#{Regexp.escape(str)}/ ).collect! do |e| 
               File.directory?(e) ? e + "/" : e
             end
@@ -165,12 +166,19 @@ class RubyShell
     tokenizer = Tokenizer.new
     while true
       begin
-        @job_control.update_job_status do |job_process|
-          notify_job_status(job_process)
+        @job_control.update_job_status do |job|
+          notify_job_status(job)
         end
 
         line = nil
-        line = Readline.readline(prompt, true)
+        begin
+          line = Readline.readline(prompt, true)
+        rescue Errno::EIO
+          # Usually caused by an exception in job control that leaves 
+          # this process not the foreground process of the terminal.
+          @job_control.restore_shell
+          retry
+        end
 
         # Exit on EOF
         if ! line
@@ -184,19 +192,20 @@ class RubyShell
           next
         end
 
-        line = expand(line)
         tokens = tokenizer.tokenize line
+        tokens = @expansion.expand(tokens)
 
         next if check_and_handle_builtin(tokens)
 
         if line[0,1] == '!'
           line = line[1,line.length]
-          run_ruby(line)
+          result = run_ruby(line)
+          pp result
         else
-          run_cmd line
+          run_cmd tokens
         end
       rescue Exception
-        puts "#{$shell_name}: #{$!}"
+        puts "#{$shell_name}: #{$!.class}: #{$!}"
         puts $!.backtrace.join "\n" if $verbose
       end
     end
@@ -206,16 +215,16 @@ class RubyShell
 
   private
 
-  def run_cmd(cmd)
+  def run_cmd(tokens)
 
     state = :foreground
-    if cmd =~ /(.*)&$/
+    if tokens.last == '&'
       state = :background
-      cmd = $1
+      tokens.pop
     end
 
-    job_process = @job_control.launch_process(cmd, state)
-    notify_job_status(job_process)
+    job = @job_control.launch_job(tokens, state)
+    notify_job_status(job)
   end
 
   def run_ruby(line)
@@ -227,11 +236,6 @@ class RubyShell
     result = nil
     t = Thread.new do
       result = eval line, @context.get_binding
-      if result.is_a? String
-        puts result
-      else
-        pp result
-      end
     end
 
     Signal.trap('INT') do
@@ -249,6 +253,7 @@ class RubyShell
   def check_and_handle_builtin(tokens)
     return false if tokens.size == 0
 
+    tokens = tokens.dup
     cmd = tokens.shift.to_sym
     return false if ! @builtins.respond_to?(cmd)
 
@@ -256,11 +261,11 @@ class RubyShell
     true
   end
 
-  def notify_job_status(job_process)
-    if job_process.stopped?
-      puts "Job '#{job_process.cmd}' stopped"
-    else
-      puts "Job '#{job_process.cmd}' completed" if job_process.fg_or_bg == :background
+  def notify_job_status(job)
+    if job.completed?
+      puts "Job '#{job.cmd}' completed" if job.fg_or_bg == :background
+    elsif job.stopped?
+      puts "Job '#{job.cmd}' stopped"
     end
   end
 
@@ -323,23 +328,6 @@ class RubyShell
 
   def replace_homedir_with_tilde(path)
     path.gsub(ENV["HOME"],'~')
-  end
-
-  def replace_tilde_with_homedir(path)
-    path.gsub('~',ENV["HOME"])
-  end
-
-  # Perform $ expansion
-  def expand_parameters(str)
-    str.gsub(/\$(\w+)/){ENV[$1]}
-  end
-
-  def expand_ruby(str)
-    str.gsub(/!([^!]+)!/){run_ruby($1).to_s}
-  end
-
-  def expand(str)
-    replace_tilde_with_homedir(expand_parameters(expand_ruby(str)))
   end
 
   def source_script(path)

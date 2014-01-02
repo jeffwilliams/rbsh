@@ -27,7 +27,16 @@ class TestTokenizer < MiniTest::Unit::TestCase
     tokens = Rbsh::Tokenizer.new.tokenize("a 'test string'")
     assert_equal 2, tokens.size, "result is #{tokens}"
     assert_equal 'a', tokens[0]
+    assert tokens[0].rbsh_quote_type.nil?
     assert_equal 'test string', tokens[1]
+    assert_equal "'", tokens[1].rbsh_quote_type
+
+    tokens = Rbsh::Tokenizer.new.tokenize('a "test string"')
+    assert_equal 2, tokens.size, "result is #{tokens}"
+    assert_equal 'a', tokens[0]
+    assert tokens[0].rbsh_quote_type.nil?
+    assert_equal 'test string', tokens[1]
+    assert_equal '"', tokens[1].rbsh_quote_type
   end
 
   def test4
@@ -72,9 +81,16 @@ class TestTokenizer < MiniTest::Unit::TestCase
     assert_equal 'pipeline', tokens[3]
   end
 
+  def test9
+    tokens = Rbsh::Tokenizer.new.tokenize("'test my' quote")
+    assert_equal 2, tokens.size, "result is #{tokens}"
+    assert_equal 'test my', tokens[0]
+    assert_equal 'quote', tokens[1]
+  end
+
   def testSplit1
     toker = Rbsh::Tokenizer.new 
-    tokens = toker.split(toker.tokenize("heres my | pipeline | of pain"), "|")
+    tokens = Rbsh::Tokenizer.split(toker.tokenize("heres my | pipeline | of pain"), "|")
     
     assert_equal 3, tokens.size, "result is #{tokens}"
     assert_equal ['heres','my'], tokens[0]
@@ -84,7 +100,7 @@ class TestTokenizer < MiniTest::Unit::TestCase
 
   def testSplit2
     toker = Rbsh::Tokenizer.new 
-    tokens = toker.split(toker.tokenize("heres my | pipeline | "), "|")
+    tokens = Rbsh::Tokenizer.split(toker.tokenize("heres my | pipeline | "), "|")
     
     assert_equal 3, tokens.size, "result is #{tokens}"
     assert_equal ['heres','my'], tokens[0]
@@ -94,7 +110,7 @@ class TestTokenizer < MiniTest::Unit::TestCase
 
   def testSplit3
     toker = Rbsh::Tokenizer.new 
-    tokens = toker.split(toker.tokenize("heres my cmd"), "|")
+    tokens = Rbsh::Tokenizer.split(toker.tokenize("heres my cmd"), "|")
     
     assert_equal 1, tokens.size, "result is #{tokens}"
     assert_equal ['heres','my', 'cmd'], tokens[0]
