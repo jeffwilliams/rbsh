@@ -14,7 +14,7 @@ end
 module Rbsh
   class Tokenizer
     def initialize
-      @quote_chars = ['"',"'"]
+      @quote_chars = ['"',"'","!"]
       # Characters that are tokens by themselves
       @token_chars = ['|','>','<', '&']
     end

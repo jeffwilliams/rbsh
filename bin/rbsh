@@ -12,6 +12,7 @@ require 'rbsh/job_control'
 require 'rbsh/termcolor'
 require 'rbsh/builtins'
 require 'rbsh/tokenizer'
+require 'rbsh/expansion'
 
 include Rbsh
 
@@ -111,6 +112,7 @@ class RubyShell
     @dirhistory.cd File.absolute_path(Dir.pwd)
     @job_control = JobControl.new
     @builtins = Builtins.new(@dirhistory, @job_control, method(:notify_job_status))
+    @expansion = Expansion.new(method(:run_ruby))
 
     source_script(RCFILE) if File.exists?(RCFILE)
 
@@ -134,7 +136,7 @@ class RubyShell
     Readline.completer_word_break_characters = Readline.basic_word_break_characters.tr "$",""
     Readline.completion_proc = Proc.new do |str|
       if Readline.point > 0
-        str = replace_tilde_with_homedir(str)
+        str = expand_tilde(str)
         
         if str =~ /\$(\w+)/
           # Complete the environment variable
@@ -146,7 +148,6 @@ class RubyShell
             complete_command(str)
           else
             # Complete for file
-            str = replace_tilde_with_homedir(str)
             Dir[str+'*'].grep( /^#{Regexp.escape(str)}/ ).collect! do |e| 
               File.directory?(e) ? e + "/" : e
             end
@@ -186,14 +187,15 @@ class RubyShell
           next
         end
 
-        line = expand(line)
         tokens = tokenizer.tokenize line
+        tokens = @expansion.expand(tokens)
 
         next if check_and_handle_builtin(tokens)
 
         if line[0,1] == '!'
           line = line[1,line.length]
-          run_ruby(line)
+          result = run_ruby(line)
+          pp result
         else
           run_cmd tokens
         end
@@ -229,11 +231,6 @@ class RubyShell
     result = nil
     t = Thread.new do
       result = eval line
-      if result.is_a? String
-        puts result
-      else
-        pp result
-      end
     end
 
     Signal.trap('INT') do
@@ -315,23 +312,6 @@ class RubyShell
 
   def replace_homedir_with_tilde(path)
     path.gsub(ENV["HOME"],'~')
-  end
-
-  def replace_tilde_with_homedir(path)
-    path.gsub('~',ENV["HOME"])
-  end
-
-  # Perform $ expansion
-  def expand_parameters(str)
-    str.gsub(/\$(\w+)/){ENV[$1]}
-  end
-
-  def expand_ruby(str)
-    str.gsub(/!([^!]+)!/){run_ruby($1).to_s}
-  end
-
-  def expand(str)
-    replace_tilde_with_homedir(expand_parameters(expand_ruby(str)))
   end
 
   def source_script(path)
