@@ -138,7 +138,7 @@ class RubyShell
     Readline.completer_word_break_characters = Readline.basic_word_break_characters.tr "$",""
     Readline.completion_proc = Proc.new do |str|
       if Readline.point > 0
-        str = expand_tilde(str)
+        str = @expansion.expand_tilde(str)
         
         if Readline.line_buffer =~ /^\w*!/ || str[0] == '!'
           # Complete ruby
