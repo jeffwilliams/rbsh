@@ -2,7 +2,7 @@ require 'rbsh/id_generator'
 require 'rbsh/tokenizer'
 
 module Rbsh
-  # A command line for a single process (i.e. without pipes)
+  # A component of a pipeline: A command line for a single process (i.e. without pipes)
   class CmdLine
     def initialize(tokens)
       @argv = []
@@ -17,6 +17,14 @@ module Rbsh
     attr_accessor :stdin_redirect
     attr_accessor :stdout_redirect
     attr_accessor :stderr_redirect
+
+    def ruby?
+      @argv.size > 0 && @argv.first.rbsh_quote_type == '!'
+    end
+
+    def ruby_code
+      @argv.first if ruby?
+    end
 
     private
     def parse_tokens(tokens)
@@ -59,6 +67,14 @@ module Rbsh
         @argv.push last
       end
     end
+  end
+
+  # A component of a pipeline: some ruby code
+  class RubyProcess
+    def initialize(code)
+      @code = code
+    end
+    attr_reader :code
   end
 
   # A command line representing a full pipeline
@@ -148,7 +164,7 @@ module Rbsh
   end
 
   class JobControl
-    def initialize
+    def initialize(ruby_binding = nil)
       #"A subshell that runs interactively has to ensure that it has been placed in the foreground by its 
       # parent shell before it can enable job control itself. It does this by getting its initial process group ID 
       # with the getpgrp function, and comparing it to the process group ID of the current foreground job associated 
@@ -192,6 +208,7 @@ module Rbsh
 
       @jobs = []
       @last_stopped_job = nil
+      @ruby_binding = ruby_binding
     end
 
     attr_accessor :jobs
@@ -346,11 +363,19 @@ module Rbsh
         $stdin.reopen(infile.dup)
         $stdout.reopen(outfile.dup)
         $stderr.reopen(errfile.dup)
-        infile.close
-        outfile.close
-        errfile.close
       
-        exec *cmd_line.argv
+        if cmd_line.ruby?
+          eval cmd_line.ruby_code, @ruby_binding
+          # If an exception is thrown, this process will exit with an error code of 1.
+          # If we make it here, everything went fine, so exit with 0.
+          exit 0
+        else
+          infile.close
+          outfile.close
+          errfile.close
+
+          exec *cmd_line.argv
+        end
       end
     end
 
