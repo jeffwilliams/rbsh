@@ -88,6 +88,45 @@ class TestTokenizer < MiniTest::Unit::TestCase
     assert_equal 'quote', tokens[1]
   end
 
+  def test10
+    tokens = Rbsh::Tokenizer.new.tokenize("!my ruby code! and stuff")
+    assert_equal 3, tokens.size, "result is #{tokens}"
+    assert_equal 'my ruby code', tokens[0]
+    assert_equal 'and', tokens[1]
+    assert_equal 'stuff', tokens[2]
+  end
+
+  def test11
+    tokens = Rbsh::Tokenizer.new.tokenize("! my ruby code ! stuff")
+    assert_equal 2, tokens.size, "result is #{tokens}"
+    assert_equal ' my ruby code ', tokens[0]
+    assert_equal 'stuff', tokens[1]
+  end
+
+  def testEscape1
+    tokens = Rbsh::Tokenizer.new.tokenize("my \\'simple escape\\'")
+    assert_equal 3, tokens.size, "result is #{tokens}"
+    assert_equal 'my', tokens[0]
+    assert_equal "'simple", tokens[1]
+    assert_equal "escape'", tokens[2]
+  end
+
+  def testEscape2
+    tokens = Rbsh::Tokenizer.new.tokenize("my \\!simple escape\\! here")
+    assert_equal 4, tokens.size, "result is #{tokens}"
+    assert_equal 'my', tokens[0]
+    assert_equal "!simple", tokens[1]
+    assert_equal "escape!", tokens[2]
+    assert_equal "here", tokens[3]
+  end
+
+  def testEscape3
+    tokens = Rbsh::Tokenizer.new.tokenize("my !internal \\! escape!")
+    assert_equal 2, tokens.size, "result is #{tokens}"
+    assert_equal 'my', tokens[0]
+    assert_equal "internal ! escape", tokens[1]
+  end
+
   def testSplit1
     toker = Rbsh::Tokenizer.new 
     tokens = Rbsh::Tokenizer.split(toker.tokenize("heres my | pipeline | of pain"), "|")

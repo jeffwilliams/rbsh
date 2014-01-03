@@ -20,24 +20,38 @@ module Rbsh
     end
 
     def tokenize(str)
+      in_quote = false
       tokens = str.each_char.to_a.reduce([]) do |memo, char|
         if memo.length > 0
           quote = memo.last[0] 
-          if @quote_chars.index(quote)
+          if in_quote
             # We are in a quote.
             if quote == char
-              memo.last[0] = ""
-              memo.last.rbsh_quote_type = quote
-              memo.push ""
+              if memo.last[-1] == '\\'
+                # The escape character is escaping the quote character.
+                memo.last[-1] = char
+              else
+                memo.last[0] = ""
+                memo.last.rbsh_quote_type = quote
+                memo.push ""
+                in_quote = false
+              end
             else
               memo.last.concat char
             end
           else
-            if @quote_chars.index(quote)
+            if @quote_chars.index(char)
+              in_quote = true
               if memo.last.length == 0
                 memo.last.concat char
               else
-                memo.push char
+                if memo.last[-1] == '\\'
+                  # The escape character is escaping the quote character. 
+                  in_quote = false
+                  memo.last[-1] = char
+                else
+                  memo.push char
+                end
               end
             elsif @token_chars.index(char)
               if memo.last.length == 0
@@ -53,6 +67,7 @@ module Rbsh
             end
           end
         else
+          in_quote = true if @quote_chars.index(char)
           memo.push char
         end
         memo
