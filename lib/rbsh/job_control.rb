@@ -32,6 +32,7 @@ module Rbsh
         elsif token == '<'
           mode = :redir_stdin
         elsif token =~ /^\d+$/
+          @argv.push last if mode == :maybe_fd_redir
           mode = :maybe_fd_redir
         else
           if mode == :redir_stdout
@@ -43,11 +44,19 @@ module Rbsh
           elsif mode == :redir_stdin
             raise "invalid stdin redirection: only one filename allowed." if @stdin_redirect
             @stdin_redirect = token
+          elsif mode == :maybe_fd_redir
+            mode = nil
+            @argv.push last
+            @argv.push token
           else
             @argv.push token
           end
         end
         last = token
+      end
+      if mode == :maybe_fd_redir
+        # If we encountered
+        @argv.push last
       end
     end
   end

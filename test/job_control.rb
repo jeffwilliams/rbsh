@@ -92,5 +92,29 @@ class TestTokenizer < MiniTest::Unit::TestCase
     assert_raises(RuntimeError){ Pipeline.new("cat > file1 file2") }
   end
 
+  def test13
+    p = Pipeline.new("ls 456")
+    assert_equal 1, p.cmd_lines.size, "number of tokens in command 'ls 456'"
+    assert_equal ['ls','456'], p.cmd_lines[0].argv
+  end
+
+  def test14
+    p = Pipeline.new("ls 456 123")
+    assert_equal 1, p.cmd_lines.size, "number of tokens in command 'ls 456'"
+    assert_equal ['ls','456','123'], p.cmd_lines[0].argv
+  end
+
+  def test15
+    p = Pipeline.new("ls 456 abc 123")
+    assert_equal 1, p.cmd_lines.size, "number of tokens in command 'ls 456'"
+    assert_equal ['ls','456','abc','123'], p.cmd_lines[0].argv
+  end
+
+  def test16
+    p = Pipeline.new("ls 456 abc 123 def")
+    assert_equal 1, p.cmd_lines.size, "number of tokens in command 'ls 456'"
+    assert_equal ['ls','456','abc','123', 'def'], p.cmd_lines[0].argv
+  end
+
 end
 
