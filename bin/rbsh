@@ -224,7 +224,7 @@ class RubyShell
     end
 
     job = @job_control.launch_job(tokens, state)
-    notify_job_status(job)
+    notify_job_status(job) if job
   end
 
   def run_ruby(line)

@@ -225,12 +225,36 @@ module Rbsh
       pipeline.cmd_lines.size.times do |i|
         cmd_line = pipeline.cmd_lines[i]
         
+        if i == 0
+          begin
+            infile = File.open(cmd_line.stdin_redirect, "r") if cmd_line.stdin_redirect
+          rescue
+            # Opening input file failed
+            puts "Opening #{cmd_line.stdout_redirect} failed: #{$!}"
+            piperead.close if piperead
+            pipewrite.close if pipewrite
+            break
+          end
+        end
+
         if i != pipeline.cmd_lines.size-1
           # Not last command in pipeline
           piperead, pipewrite = IO.pipe
           outfile = pipewrite
         else
-          outfile = $stdout
+          if cmd_line.stdout_redirect
+            begin
+              outfile = File.open(cmd_line.stdout_redirect,"w")
+            rescue
+              # Opening output file failed
+              puts "Opening #{cmd_line.stdout_redirect} failed: #{$!}"
+              piperead.close if piperead
+              pipewrite.close if pipewrite
+              break
+            end
+          else
+            outfile = $stdout
+          end
         end
 
         # launch command here
