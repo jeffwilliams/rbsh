@@ -132,6 +132,10 @@ class RubyShell
     RbReadline.rl_bind_key("\e\e[C", :rl_dir_forward)
     RbReadline.rl_bind_key("\e\e[D", :rl_dir_back)
     RbReadline.rl_bind_key("\e\e[A", :rl_dir_up)
+    # GNU screen
+    RbReadline.rl_bind_key("\eO3C", :rl_dir_forward)
+    RbReadline.rl_bind_key("\eO3D", :rl_dir_back)
+    RbReadline.rl_bind_key("\eO3A", :rl_dir_up)
 
     Readline.completion_append_character = ""
     # Allow $ inside words so that we can tell if we are replacing an env var
